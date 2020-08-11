@@ -6,24 +6,28 @@ import (
 
 type Command string
 
+type Handler func(ctx context.Context, next func(context.Context) error) error
 type Action struct {
 	Command Command
-	Handler func(ctx context.Context, next func(context.Context) error) error
+	Handler Handler
 }
 
 func NewAction() *Action {
 	return &Action{}
 }
 
-func nextAction(o []*Action) func(context.Context) error {
-	return func(ctx context.Context) error {
-		return execActions(ctx, o)
-	}
-}
-
-func execActions(ctx context.Context, o []*Action) error {
+func execActions(ctx context.Context, o []*Action) (context.Context, error) {
 	if len(o) == 0 {
-		return nil
+		return ctx, nil
 	}
-	return o[0].Handler(ctx, nextAction(o[1:]))
+	var lastctx context.Context = ctx
+	err := o[0].Handler(ctx, func(nextctx context.Context) error {
+		var nexterr error
+		lastctx, nexterr = execActions(nextctx, o[1:])
+		return nexterr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return lastctx, nil
 }

@@ -21,7 +21,14 @@ func (s *System) ErrIfNotInStage(stage Stage) error {
 	}
 	return nil
 }
-
+func (s *System) Ready() error {
+	err := s.ErrIfNotInStage(StageNew)
+	if err != nil {
+		return err
+	}
+	s.Stage = StageReady
+	return nil
+}
 func (s *System) Configuring() error {
 	err := s.ErrIfNotInStage(StageReady)
 	if err != nil {
@@ -37,7 +44,7 @@ func (s *System) Start() error {
 		return err
 	}
 	for _, v := range s.services {
-		err = v.Start()
+		err = v.StartService()
 		if err != nil {
 			return err
 		}
@@ -52,7 +59,7 @@ func (s *System) Stop() error {
 		return err
 	}
 	for _, v := range s.services {
-		err = v.Stop()
+		err = v.StopService()
 		if err != nil {
 			return err
 		}
@@ -65,28 +72,28 @@ func (s *System) InstallService(service Service) error {
 	if err != nil {
 		return err
 	}
-	name := service.Name()
+	name := service.ServiceName()
 	for _, v := range s.services {
-		if v.Name() == name {
+		if v.ServiceName() == name {
 			return fmt.Errorf("herbsystem: %w (%s)", ErrServiceNameDuplicated, name)
 		}
 	}
-	err = service.Init()
+	err = service.InitService()
 	if err != nil {
 		return err
 	}
 	s.services = append(s.services, service)
-	o := service.Actions()
+	o := service.ServiceActions()
 	for _, v := range o {
 		s.actions[v.Command] = append(s.actions[v.Command], v)
 	}
 	return nil
 }
 
-func (s *System) ExecActions(ctx context.Context, cmd Command) error {
+func (s *System) ExecActions(ctx context.Context, cmd Command) (context.Context, error) {
 	err := s.ErrIfNotInStage(StageRunning)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return execActions(ctx, s.actions[cmd])
 }
@@ -96,7 +103,7 @@ func (s *System) GetConfigurableService(name string) (Service, error) {
 		return nil, err
 	}
 	for _, v := range s.services {
-		if v.Name() == name {
+		if v.ServiceName() == name {
 			return v, nil
 		}
 	}

@@ -1,9 +1,28 @@
 package herbsystem
 
 type Service interface {
-	Init() error
-	Name() string
-	Start() error
-	Stop() error
-	Actions() []*Action
+	InitService() error
+	ServiceName() string
+	StartService() error
+	StopService() error
+	ServiceActions() []*Action
+}
+
+type NopService struct {
+}
+
+func (s NopService) InitService() error {
+	return nil
+}
+func (s NopService) ServiceName() string {
+	return ""
+}
+func (s NopService) StartService() error {
+	return nil
+}
+func (s NopService) StopService() error {
+	return nil
+}
+func (s NopService) ServiceActions() []*Action {
+	return nil
 }
