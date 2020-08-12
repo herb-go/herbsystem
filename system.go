@@ -39,10 +39,10 @@ func (s *System) Configuring() error {
 }
 func (s *System) Start() error {
 	err := s.ErrIfNotInStage(StageConfiguring)
-	s.Stage = StageStarting
 	if err != nil {
 		return err
 	}
+	s.Stage = StageStarting
 	for _, v := range s.services {
 		err = v.StartService()
 		if err != nil {
@@ -54,10 +54,10 @@ func (s *System) Start() error {
 }
 func (s *System) Stop() error {
 	err := s.ErrIfNotInStage(StageRunning)
-	s.Stage = StageStoping
 	if err != nil {
 		return err
 	}
+	s.Stage = StageStoping
 	for _, v := range s.services {
 		err = v.StopService()
 		if err != nil {
