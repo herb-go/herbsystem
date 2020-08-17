@@ -5,6 +5,7 @@ type Service interface {
 	ServiceName() string
 	StartService() error
 	StopService() error
+	ConfigurService() error
 	ServiceActions() []*Action
 }
 
@@ -24,5 +25,8 @@ func (s NopService) StopService() error {
 	return nil
 }
 func (s NopService) ServiceActions() []*Action {
+	return nil
+}
+func (s NopService) ConfigurService() error {
 	return nil
 }

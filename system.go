@@ -34,6 +34,14 @@ func (s *System) Configuring() error {
 	if err != nil {
 		return err
 	}
+	errs := NewErrors()
+	for _, v := range s.services {
+		errs.Add(v.ConfigurService())
+	}
+	err = errs.ToError()
+	if err != nil {
+		return err
+	}
 	s.Stage = StageConfiguring
 	return nil
 }
@@ -42,12 +50,13 @@ func (s *System) Start() error {
 	if err != nil {
 		return err
 	}
-	s.Stage = StageStarting
+	errs := NewErrors()
 	for _, v := range s.services {
-		err = v.StartService()
-		if err != nil {
-			return err
-		}
+		errs.Add(v.StartService())
+	}
+	err = errs.ToError()
+	if err != nil {
+		return err
 	}
 	s.Stage = StageRunning
 	return nil
@@ -58,12 +67,15 @@ func (s *System) Stop() error {
 		return err
 	}
 	s.Stage = StageStoping
+	errs := NewErrors()
 	for _, v := range s.services {
-		err = v.StopService()
-		if err != nil {
-			return err
-		}
+		errs.Add(v.StopService())
 	}
+	err = errs.ToError()
+	if err != nil {
+		return err
+	}
+
 	s.Stage = StageReady
 	return nil
 }
