@@ -91,6 +91,23 @@ func TestNopService(t *testing.T) {
 	if service == nil {
 		t.Fatal(service)
 	}
+	err = s.LockConfigurableService("")
+	if err != nil {
+		panic(err)
+	}
+	if service == nil {
+		t.Fatal(service)
+	}
+	service, err = s.GetConfigurableService("")
+	if err != nil {
+		panic(err)
+	}
+	if service != nil {
+		t.Fatal(service)
+	}
+	if len(s.services) != 1 {
+		t.Fatal()
+	}
 	service, err = s.GetConfigurableService("notexists")
 	if err != nil {
 		panic(err)

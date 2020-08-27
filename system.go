@@ -8,6 +8,7 @@ import (
 type System struct {
 	Stage    Stage
 	services []Service
+	locked   map[string]bool
 	actions  map[Command][]*Action
 }
 
@@ -43,6 +44,7 @@ func (s *System) Configuring() error {
 		return err
 	}
 	s.Stage = StageConfiguring
+	s.locked = map[string]bool{}
 	return nil
 }
 func (s *System) Start() error {
@@ -114,12 +116,23 @@ func (s *System) GetConfigurableService(name string) (Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	if s.locked[name] {
+		return nil, nil
+	}
 	for _, v := range s.services {
 		if v.ServiceName() == name {
 			return v, nil
 		}
 	}
 	return nil, nil
+}
+func (s *System) LockConfigurableService(name string) error {
+	_, err := s.GetConfigurableService(name)
+	if err != nil {
+		return err
+	}
+	s.locked[name] = true
+	return nil
 }
 func NewSystem() *System {
 	return &System{
