@@ -177,6 +177,9 @@ func TestAction(t *testing.T) {
 	MustConfigure(s)
 	MustStart(s)
 	ctx := MustExecActions(resultContext(), s, "test")
+	if !IsFinished(ctx) {
+		t.Fatal()
+	}
 	r := getResult(ctx)
 	if len(*r) != 3 || (*r)[0] != "action1" || (*r)[1] != "action2" || (*r)[2] != "action4" {
 		t.Fatal(*r)
