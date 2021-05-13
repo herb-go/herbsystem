@@ -1,33 +1,30 @@
 package herbsystem
 
-import (
-	"context"
-)
-
 type Command string
 
-type Handler func(ctx context.Context, next func(context.Context) error) error
+const CommandStart = Command("start")
+const CommandStop = Command("stop")
+
 type Action struct {
-	Command Command
-	Handler Handler
+	Command interface{}
+	Process Process
 }
 
 func NewAction() *Action {
 	return &Action{}
 }
 
-func execActions(ctx context.Context, o []*Action) (context.Context, error) {
-	if len(o) == 0 {
-		return ctx, nil
+func CreateAction(cmd interface{}, p Process) *Action {
+	return &Action{
+		Command: cmd,
+		Process: p,
 	}
-	var lastctx context.Context = ctx
-	err := o[0].Handler(ctx, func(nextctx context.Context) error {
-		var nexterr error
-		lastctx, nexterr = execActions(nextctx, o[1:])
-		return nexterr
-	})
-	if err != nil {
-		return nil, err
-	}
-	return lastctx, nil
+}
+
+func CreateStartAction(p Process) *Action {
+	return CreateAction(CommandStart, p)
+}
+
+func CreateStopAction(p Process) *Action {
+	return CreateAction(CommandStop, p)
 }

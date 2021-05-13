@@ -6,6 +6,16 @@ import (
 	"testing"
 )
 
+func Catch(f func()) (err error) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			err = r.(error)
+		}
+	}()
+	f()
+	return nil
+}
 func resultContext() context.Context {
 	result := &[]string{}
 	return context.WithValue(context.Background(), "result", result)
@@ -16,178 +26,141 @@ func getResult(ctx context.Context) *[]string {
 	return v.(*[]string)
 }
 
-type testService struct {
-	NopService
+type testModule struct {
+	NopModule
 	name    string
 	actions []*Action
 }
 
-func (s *testService) ServiceActions() []*Action {
-	return s.actions
+func (s *testModule) InitProcess(ctx context.Context, system System, next func(context.Context, System)) {
+	system.MountActions(s.actions...)
+	next(ctx, system)
 }
-func (s *testService) ServiceName() string {
+func (s *testModule) ModuleName() string {
 	return s.name
 }
 func TestStage(t *testing.T) {
 	var err error
-	s := NewSystem()
-	if s.Stage != StageNew {
+	s := New()
+	if s.Stage() != StageNew {
 		t.Fatal(s)
 	}
-	_, err = s.ExecActions(nil, "")
+	err = Catch(func() {
+		MustExecActions(context.TODO(), s, "")
+	})
 	if err == nil || errors.Unwrap(err) != ErrInvalidStage {
 		t.Fatal(err)
 	}
-	s.Stage = Stage(-1)
-	err = s.InstallService(nil)
+	s.SetStage(Stage(-1))
+	err = Catch(func() { s.MustRegisterModule(nil) })
 	if err == nil || errors.Unwrap(err) != ErrInvalidStage {
 		t.Fatal(err)
 	}
-	err = s.Ready()
+	err = Catch(func() { MustReady(s) })
 	if err == nil || errors.Unwrap(err) != ErrInvalidStage {
 		t.Fatal(err)
 	}
-	err = s.Configuring()
+	err = Catch(func() { MustConfigure(s) })
 	if err == nil || errors.Unwrap(err) != ErrInvalidStage {
 		t.Fatal(err)
 	}
-	_, err = s.GetConfigurableService("test")
+	err = Catch(func() { MustGetConfigurableModule(s, "test") })
 	if err == nil || errors.Unwrap(err) != ErrInvalidStage {
 		t.Fatal(err)
 	}
-	err = s.Start()
+	err = Catch(func() { MustStart(s) })
 	if err == nil || errors.Unwrap(err) != ErrInvalidStage {
 		t.Fatal(err)
 	}
-	err = s.Stop()
+	err = Catch(func() { MustStop(s) })
 	if err == nil || errors.Unwrap(err) != ErrInvalidStage {
 		t.Fatal(err)
 	}
 }
 
-func TestNopService(t *testing.T) {
+func TestNopModule(t *testing.T) {
 	var err error
-	s := NewSystem()
-	err = s.InstallService(NopService{})
-	if err != nil {
+	s := New()
+	s.MustRegisterModule(NopModule{})
+	err = Catch(func() { s.MustRegisterModule(NopModule{}) })
+	if err == nil || errors.Unwrap(err) != ErrModuleNameDuplicated {
 		panic(err)
 	}
-	err = s.InstallService(NopService{})
-	if err == nil || errors.Unwrap(err) != ErrServiceNameDuplicated {
-		panic(err)
+	s = New()
+	s.MustRegisterModule(NopModule{})
+	MustReady(s)
+	MustConfigure(s)
+	m := MustGetConfigurableModule(s, "")
+	if m == nil {
+		t.Fatal(m)
 	}
-	err = s.Ready()
-	if err != nil {
-		panic(err)
+	m = MustGetConfigurableModule(s, "notexists")
+	if m != nil {
+		t.Fatal(m)
 	}
-	err = s.Configuring()
-	if err != nil {
-		panic(err)
-	}
-	service, err := s.GetConfigurableService("")
-	if err != nil {
-		panic(err)
-	}
-	if service == nil {
-		t.Fatal(service)
-	}
-	err = s.LockConfigurableService("")
-	if err != nil {
-		panic(err)
-	}
-	if service == nil {
-		t.Fatal(service)
-	}
-	service, err = s.GetConfigurableService("")
-	if err != nil {
-		panic(err)
-	}
-	if service != nil {
-		t.Fatal(service)
-	}
-	if len(s.services) != 1 {
-		t.Fatal()
-	}
-	service, err = s.GetConfigurableService("notexists")
-	if err != nil {
-		panic(err)
-	}
-	if service != nil {
-		t.Fatal(service)
-	}
-	err = s.Start()
-	if err != nil {
-		panic(err)
-	}
-	_, err = s.ExecActions(nil, "")
-	if err != nil {
-		panic(err)
-	}
-	err = s.Stop()
-	if err != nil {
-		panic(err)
-	}
+	MustStart(s)
+	MustExecActions(context.TODO(), s, "")
+	MustStop(s)
 }
 
 func TestAction(t *testing.T) {
 	var err error
 	action1 := NewAction()
 	action1.Command = "test"
-	action1.Handler = func(ctx context.Context, next func(context.Context) error) error {
+	action1.Process = func(ctx context.Context, system System, next func(context.Context, System)) {
 		result := getResult(ctx)
 		*result = append(*result, "action1")
-		return next(ctx)
+		next(ctx, system)
 	}
 	action2 := NewAction()
 	action2.Command = "test"
-	action2.Handler = func(ctx context.Context, next func(context.Context) error) error {
+	action2.Process = func(ctx context.Context, system System, next func(context.Context, System)) {
 		result := getResult(ctx)
 		*result = append(*result, "action2")
-		return next(ctx)
+		next(ctx, system)
 	}
 	action3 := NewAction()
 	action3.Command = "test2"
-	action3.Handler = func(ctx context.Context, next func(context.Context) error) error {
+	action3.Process = func(ctx context.Context, system System, next func(context.Context, System)) {
 		result := getResult(ctx)
 		*result = append(*result, "action3")
-		return nil
 	}
 	action4 := NewAction()
 	action4.Command = "test"
-	action4.Handler = func(ctx context.Context, next func(context.Context) error) error {
+	action4.Process = func(ctx context.Context, system System, next func(context.Context, System)) {
 		result := getResult(ctx)
 		*result = append(*result, "action4")
-		return next(context.WithValue(ctx, "last", true))
+		next(context.WithValue(ctx, "last", true), system)
 	}
 	action5 := NewAction()
 	action5.Command = "test2"
-	action5.Handler = func(ctx context.Context, next func(context.Context) error) error {
+	action5.Process = func(ctx context.Context, system System, next func(context.Context, System)) {
 		result := getResult(ctx)
 		*result = append(*result, "action5")
-		return next(ctx)
+		next(ctx, system)
 	}
 	action6 := NewAction()
 	action6.Command = "test3"
-	action6.Handler = func(ctx context.Context, next func(context.Context) error) error {
+	action6.Process = func(ctx context.Context, system System, next func(context.Context, System)) {
 		result := getResult(ctx)
 		*result = append(*result, "action6")
-		return errors.New("stop")
+		panic(errors.New("stop"))
 	}
 	action7 := NewAction()
 	action7.Command = "test3"
-	action7.Handler = func(ctx context.Context, next func(context.Context) error) error {
+	action7.Process = func(ctx context.Context, system System, next func(context.Context, System)) {
 		result := getResult(ctx)
 		*result = append(*result, "action7")
-		return next(ctx)
+		next(ctx, system)
 	}
-	servece1 := &testService{
+	module1 := &testModule{
 		name: "server1",
 		actions: []*Action{
 			action1,
 			action2,
 		},
 	}
-	servece2 := &testService{
+	module2 := &testModule{
 		name: "server2",
 		actions: []*Action{
 			action3,
@@ -197,26 +170,13 @@ func TestAction(t *testing.T) {
 			action7,
 		},
 	}
-	s := NewSystem()
-	s.InstallService(servece1)
-	s.InstallService(servece2)
-	err = s.Ready()
-	if err != nil {
-		panic(err)
-	}
-	err = s.Configuring()
-	if err != nil {
-		panic(err)
-	}
-
-	err = s.Start()
-	if err != nil {
-		panic(err)
-	}
-	ctx, err := s.ExecActions(resultContext(), "test")
-	if err != nil {
-		panic(err)
-	}
+	s := New()
+	s.MustRegisterModule(module1)
+	s.MustRegisterModule(module2)
+	MustReady(s)
+	MustConfigure(s)
+	MustStart(s)
+	ctx := MustExecActions(resultContext(), s, "test")
 	r := getResult(ctx)
 	if len(*r) != 3 || (*r)[0] != "action1" || (*r)[1] != "action2" || (*r)[2] != "action4" {
 		t.Fatal(*r)
@@ -225,25 +185,21 @@ func TestAction(t *testing.T) {
 	if !last {
 		t.Fatal(last)
 	}
-	ctx, err = s.ExecActions(resultContext(), "test2")
-	if err != nil {
-		panic(err)
-	}
-	r = getResult(ctx)
-	if len(*r) != 1 || (*r)[0] != "action3" {
-		t.Fatal(*r)
+	ctx = MustExecActions(resultContext(), s, "test2")
+
+	if ctx != nil {
+		t.Fatal()
 	}
 	rctx := resultContext()
-	ctx, err = s.ExecActions(rctx, "test3")
-	if ctx != nil || err == nil {
+	err = Catch(func() {
+		MustExecActions(rctx, s, "test3")
+	})
+	if err == nil {
 		t.Fatal(ctx, err)
 	}
 	r = getResult(rctx)
 	if len(*r) != 1 || (*r)[0] != "action6" {
 		t.Fatal(*r)
 	}
-	err = s.Stop()
-	if err != nil {
-		panic(err)
-	}
+	MustStop(s)
 }
