@@ -67,7 +67,7 @@ func MustConfigure(s System) {
 	modules := s.SystemModules()
 	processes := make([]Process, len(modules))
 	for k := range modules {
-		processes[k] = modules[k].InitProcess
+		processes[k] = modules[k].InstallProcess
 	}
 	ComposeProcess(processes...)(WithFinished(s.SystemContext()), s, Finish)
 	s.SetSystemStage(StageConfiguring)

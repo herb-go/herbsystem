@@ -22,7 +22,7 @@ type testModule struct {
 	actions []*Action
 }
 
-func (s *testModule) InitProcess(ctx context.Context, system System, next func(context.Context, System)) {
+func (s *testModule) InstallProcess(ctx context.Context, system System, next func(context.Context, System)) {
 	system.MountSystemActions(s.actions...)
 	next(ctx, system)
 }
