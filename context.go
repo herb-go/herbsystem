@@ -2,21 +2,21 @@ package herbsystem
 
 import "context"
 
-type ContextName string
+type ContextKey string
 
-const ContextNameFinished = ContextName("finished")
+const ContextKeyFinished = ContextKey("finished")
 
 func WithFinished(ctx context.Context) context.Context {
 	var finished bool
-	return context.WithValue(ctx, ContextNameFinished, &finished)
+	return context.WithValue(ctx, ContextKeyFinished, &finished)
 }
 
 func IsFinished(ctx context.Context) bool {
-	successed := ctx.Value(ContextNameFinished).(*bool)
+	successed := ctx.Value(ContextKeyFinished).(*bool)
 	return *successed
 }
 
 func Finish(ctx context.Context, s System) {
-	v := ctx.Value(ContextNameFinished).(*bool)
+	v := ctx.Value(ContextKeyFinished).(*bool)
 	*v = true
 }

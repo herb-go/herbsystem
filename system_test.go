@@ -6,16 +6,6 @@ import (
 	"testing"
 )
 
-func Catch(f func()) (err error) {
-	defer func() {
-		r := recover()
-		if r != nil {
-			err = r.(error)
-		}
-	}()
-	f()
-	return nil
-}
 func resultContext() context.Context {
 	result := &[]string{}
 	return context.WithValue(context.Background(), "result", result)
@@ -33,7 +23,7 @@ type testModule struct {
 }
 
 func (s *testModule) InitProcess(ctx context.Context, system System, next func(context.Context, System)) {
-	system.MountActions(s.actions...)
+	system.MountSystemActions(s.actions...)
 	next(ctx, system)
 }
 func (s *testModule) ModuleName() string {
@@ -42,7 +32,7 @@ func (s *testModule) ModuleName() string {
 func TestStage(t *testing.T) {
 	var err error
 	s := New()
-	if s.Stage() != StageNew {
+	if s.SystemStage() != StageNew {
 		t.Fatal(s)
 	}
 	err = Catch(func() {
@@ -51,8 +41,8 @@ func TestStage(t *testing.T) {
 	if err == nil || errors.Unwrap(err) != ErrInvalidStage {
 		t.Fatal(err)
 	}
-	s.SetStage(Stage(-1))
-	err = Catch(func() { s.MustRegisterModule(nil) })
+	s.SetSystemStage(Stage(-1))
+	err = Catch(func() { s.MustRegisterSystemModule(nil) })
 	if err == nil || errors.Unwrap(err) != ErrInvalidStage {
 		t.Fatal(err)
 	}
@@ -81,13 +71,13 @@ func TestStage(t *testing.T) {
 func TestNopModule(t *testing.T) {
 	var err error
 	s := New()
-	s.MustRegisterModule(NopModule{})
-	err = Catch(func() { s.MustRegisterModule(NopModule{}) })
+	s.MustRegisterSystemModule(NopModule{})
+	err = Catch(func() { s.MustRegisterSystemModule(NopModule{}) })
 	if err == nil || errors.Unwrap(err) != ErrModuleNameDuplicated {
 		panic(err)
 	}
 	s = New()
-	s.MustRegisterModule(NopModule{})
+	s.MustRegisterSystemModule(NopModule{})
 	MustReady(s)
 	MustConfigure(s)
 	m := MustGetConfigurableModule(s, "")
@@ -171,8 +161,8 @@ func TestAction(t *testing.T) {
 		},
 	}
 	s := New()
-	s.MustRegisterModule(module1)
-	s.MustRegisterModule(module2)
+	s.MustRegisterSystemModule(module1)
+	s.MustRegisterSystemModule(module2)
 	MustReady(s)
 	MustConfigure(s)
 	MustStart(s)

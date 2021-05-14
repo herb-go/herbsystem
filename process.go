@@ -17,3 +17,36 @@ func ComposeProcess(series ...Process) Process {
 		})
 	}
 }
+
+func Wrap(h ...func()) Process {
+	return func(ctx context.Context, system System, next func(context.Context, System)) {
+		for k := range h {
+			h[k]()
+		}
+		next(ctx, system)
+	}
+}
+
+func WrapOrPanic(h ...func() error) Process {
+	return func(ctx context.Context, system System, next func(context.Context, System)) {
+		for k := range h {
+			if err := h[k](); err != nil {
+				panic(err)
+			}
+
+		}
+		next(ctx, system)
+	}
+}
+
+func WrapOrLog(h ...func() error) Process {
+	return func(ctx context.Context, system System, next func(context.Context, System)) {
+		for k := range h {
+			if err := h[k](); err != nil {
+				system.LogSystemError(err)
+			}
+
+		}
+		next(ctx, system)
+	}
+}

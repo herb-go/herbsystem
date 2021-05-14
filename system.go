@@ -6,17 +6,20 @@ import (
 )
 
 type System interface {
-	Stage() Stage
-	SetStage(stage Stage)
-	Modules() []Module
-	MustRegisterModule(m Module)
-	GetActions(cmd interface{}) []Process
-	MountActions(actions ...*Action)
-	Reset()
+	SystemStage() Stage
+	SetSystemStage(stage Stage)
+	SystemModules() []Module
+	MustRegisterSystemModule(m Module)
+	GetSystemActions(cmd interface{}) []Process
+	MountSystemActions(actions ...*Action)
+	ResetSystem()
+	SystemContext() context.Context
+	SetSystemLogger(func(error))
+	LogSystemError(error)
 }
 
 func PanicIfNotInStage(s System, stage Stage) {
-	ss := s.Stage()
+	ss := s.SystemStage()
 	if stage != ss {
 		name := StageNames[ss]
 		if name == "" {
@@ -28,7 +31,7 @@ func PanicIfNotInStage(s System, stage Stage) {
 
 func MustExecActions(ctx context.Context, s System, cmd interface{}) context.Context {
 	PanicIfNotInStage(s, StageRunning)
-	p := s.GetActions(cmd)
+	p := s.GetSystemActions(cmd)
 	var result context.Context
 	ComposeProcess(p...)(WithFinished(ctx), s, func(newctx context.Context, s System) {
 		result = newctx
@@ -39,7 +42,7 @@ func MustExecActions(ctx context.Context, s System, cmd interface{}) context.Con
 
 func MustGetConfigurableModule(s System, name string) Module {
 	PanicIfNotInStage(s, StageConfiguring)
-	for _, v := range s.Modules() {
+	for _, v := range s.SystemModules() {
 		if v.ModuleName() == name {
 			return v
 		}
@@ -47,31 +50,38 @@ func MustGetConfigurableModule(s System, name string) Module {
 	return nil
 }
 
+func initSystemModules(s System) {
+	for _, v := range s.SystemModules() {
+		v.InitModule()
+	}
+}
 func MustReady(s System) {
 	PanicIfNotInStage(s, StageNew)
-	s.SetStage(StageReady)
+	initSystemModules(s)
+	s.SetSystemStage(StageReady)
 }
 
 func MustConfigure(s System) {
 	PanicIfNotInStage(s, StageReady)
-	s.Reset()
-	modules := s.Modules()
+	s.ResetSystem()
+	modules := s.SystemModules()
 	processes := make([]Process, len(modules))
 	for k := range modules {
 		processes[k] = modules[k].InitProcess
 	}
-	ComposeProcess(processes...)(WithFinished(context.TODO()), s, Finish)
-	s.SetStage(StageConfiguring)
+	ComposeProcess(processes...)(WithFinished(s.SystemContext()), s, Finish)
+	s.SetSystemStage(StageConfiguring)
 }
 
 func MustStart(s System) {
 	PanicIfNotInStage(s, StageConfiguring)
-	ComposeProcess(s.GetActions(CommandStart)...)(WithFinished(context.TODO()), s, Finish)
-	s.SetStage(StageRunning)
+	ComposeProcess(s.GetSystemActions(CommandStart)...)(WithFinished(s.SystemContext()), s, Finish)
+	s.SetSystemStage(StageRunning)
 }
 
 func MustStop(s System) {
 	PanicIfNotInStage(s, StageRunning)
-	ComposeProcess(s.GetActions(CommandStop)...)(WithFinished(context.TODO()), s, Finish)
-	s.SetStage(StageReady)
+	ComposeProcess(s.GetSystemActions(CommandStop)...)(WithFinished(s.SystemContext()), s, Finish)
+	initSystemModules(s)
+	s.SetSystemStage(StageReady)
 }
