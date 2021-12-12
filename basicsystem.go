@@ -50,7 +50,10 @@ func (s *BasicSystem) SetSystemLogger(l func(error)) {
 	s.logger = l
 }
 func (s *BasicSystem) LogSystemError(err error) {
-	s.logger(err)
+	errs := ToErrors(err).All()
+	for _, err := range errs {
+		s.logger(err)
+	}
 }
 func New() *BasicSystem {
 	return &BasicSystem{
